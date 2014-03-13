@@ -1,0 +1,34 @@
+<html>
+<head> 
+	<title>Simple Example</title> 
+	<meta http-equiv='Content-Type' content='text/html; charset=utf-8'> 
+	<script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+    <style>
+        #text{
+            color: white;
+            text-shadow: 0px 1px 1px #929090;
+            margin: 0 auto;
+            width:100%;
+            max-width:100%;
+            text-align: center;
+            margin-top: 200px;
+            position:fixed;
+        }
+    </style>
+   
+</head> 
+<body> 
+<div id="text">Bhoomit Vasani</div>
+       <script>
+        var font = 12;
+        var margin = 200;
+        var interval = setInterval(function(){
+            margin -= 2;
+            $('#text').css('font-size', font++ + 'px');
+            $('#text').css('margin-top', margin + 'px');
+            if($('#text').width() > (window.width/2) || font > 65)
+                clearInterval(interval);
+        },10);
+    </script>
+</body>
+</html>

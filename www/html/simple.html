@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html> 
+<head> 
+	<title>Simple Example</title> 
+	<meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
+    <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+	<script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false" type="text/javascript"></script> 
+	<script src="../static/scripts/three.min.js"></script>
+	<script src="../static/scripts/GSVPano.js"></script>
+	<script src="../static/scripts/Hyperlapse.js"></script>
+    <script src="../static/fonts/ubuntu_regular.typeface.js"></script>
+    <style>
+        body{
+            width:1920px;
+            height:1080px;
+        }
+        #text{
+            color: white;
+            text-shadow: 0px 1px 1px #929090;
+            margin: 0 auto;
+            width:100%;
+            max-width:100%;
+            text-align: center;
+            margin-top: 200px;
+            position:fixed;
+            font-family: 'Ubuntu', 'Ubuntu Beta', UbuntuBeta, Ubuntu, 'Bitstream Vera Sans', 'DejaVu Sans', Tahoma, sans-serif;
+        }
+    </style>
+	<script> 
+        
+        Array.prototype.compare = function (array) {
+            // if the other array is a falsy value, return
+            if (!array)
+                return false;
+        
+            // compare lengths - can save a lot of time
+            if (this.length != array.length)
+                return false;
+        
+            for (var i = 0; i < this.length; i++) {
+                // Check if we have nested arrays
+                if (this[i] instanceof Array && array[i] instanceof Array) {
+                    // recurse into the nested arrays
+                    if (!this[i].compare(array[i]))
+                        return false;
+                }
+                else if (this[i] != array[i]) {
+                    // Warning - two different object instances will never be equal: {x:20} != {x:20}
+                    return false;
+                }
+            }
+            return true;
+        }
+		title = getQueryParameterByName('title',window.location.href).split('%')[0];
+		var hyperlapse = null;
+		var posOffset = 1;
+		var dest_service_resp = [];
+		var land1 = null;
+		var land2 = null;
+		function getQueryParameterByName(name, url){
+			console.log(url);
+			var regexS = "[\\?&]" + name + "=([^&#]*)";
+			var regex = new RegExp(regexS);
+			var results = regex.exec(url);
+			var value = "";
+			if(results != null){
+				try{
+					value = decodeURIComponent(results[1].replace(/\+/g, " "));
+				}catch(e){
+					value = results[1].replace(/\+/g, " ");
+				}  
+			}
+			return value;
+		}
+		function init() {
+			if(typeof window.callPhantom == 'function')
+				console.log = function(str){
+                    if( typeof str == 'object') str = JSON.stringify(str);
+					window.callPhantom({ev:str});    
+				}
+				console.log(window.location.href);
+				var latlng1 = getQueryParameterByName('latlng1', window.location.href).split(',');
+				var latlng2 = getQueryParameterByName('latlng2', window.location.href).split(',');
+                if(latlng1.compare(latlng2) === true){
+                    if(typeof window.callPhantom == 'function')
+                        window.callPhantom({'ev':'errorExit', 'message': "Both lat/lng are same"});
+                }
+				console.log(latlng1);
+				console.log(latlng2);
+				hyperlapse = new Hyperlapse(document.getElementById('pano'), {
+					fov: 90,
+					width: window.innerWidth,
+					height: window.innerHeight,
+					zoom: 2,
+					use_lookat: false,
+					distance_between_points: 5,
+					max_points: 350
+				});
+
+
+				hyperlapse.onError = function(e) {
+					console.log(e);
+                    if(typeof window.callPhantom == 'function')
+						window.callPhantom({'ev':'errorExit', 'message': e.message});
+				};
+
+				hyperlapse.onRouteComplete = function(e) {
+					try{
+						hyperlapse.load();	
+					}catch(e){
+						if(typeof window.callPhantom == 'function')
+							window.callPhantom({'ev':'exit'});
+						hyperlapse.onFrame({'position':1});
+					}
+
+				};
+
+				hyperlapse.onFrame = function(e) {
+					console.log(title + " :: Position: "+ (e.position+1) +" of "+ hyperlapse.length());
+					if(typeof window.callPhantom == 'function')
+						window.callPhantom({'ev':'render', position:e.position+posOffset});
+					if(e.position >= hyperlapse.length() - 40) render();
+					if(e.position+1 == hyperlapse.length()){
+						posOffset += hyperlapse.length();
+						var k = 0;
+						var interval = null;
+						interval = setInterval(function(){
+							k+=3
+							hyperlapse.position.x = k;
+							setTimeout(function(){
+                                console.log(title + " :: Render 360 :: " + k/3);
+								if(typeof window.callPhantom == 'function')
+									window.callPhantom({'ev':'render', position: posOffset++});
+							},50)
+							if(k>=360){
+								clearInterval(interval);	
+								setTimeout(function(){if(typeof window.callPhantom == 'function') window.callPhantom({'ev':'exit'})},2000);
+							} 
+						},100);
+
+					}else{
+						setTimeout(function(){hyperlapse.next()},30);
+                        setTimeout(function(){hyperlapse.garbageCollect()},60);
+					}
+				};
+
+				hyperlapse.onLoadComplete = function(e) {
+                    if(typeof window.callPhantom == 'function')
+						window.callPhantom({'ev':'render', position:posOffset});
+					setTimeout(function(){hyperlapse.next()},100);
+				};
+
+				// Google Maps API stuff here...
+				var directions_service = new google.maps.DirectionsService();
+
+				var route = {
+					request:{
+						origin: new google.maps.LatLng(latlng1[0],latlng1[1]),
+						destination: new google.maps.LatLng(latlng2[0],latlng2[1]),
+                        //travelMode: google.maps.DirectionsTravelMode.DRIVING
+                        travelMode: google.maps.DirectionsTravelMode.WALKING,
+                        provideRouteAlternatives: true
+					}
+				};
+
+				directions_service.route(route.request, function(response_0, status) {
+					console.log(title + " :: WALKING :: " + status);
+                    var result = getLongestRoute(response_0);
+					if (status != google.maps.DirectionsStatus.OK || result.bigDist < 2000) {
+                        route.request.travelMode = google.maps.TravelMode.DRIVING;
+                        directions_service.route(route.request, function(response_0, status) {
+                            var result = getLongestRoute(response_0);
+                            console.log(title + " :: DRIVING :: " + status);
+                            if (status != google.maps.DirectionsStatus.OK) {
+                                route.request.travelMode = google.maps.TravelMode.TRANSIT;
+                                directions_service.route(route.request, function(response_0, status) {
+                                    console.log(title + " :: TRANSIT :: " + status);
+                                    if (status != google.maps.DirectionsStatus.OK) {
+                                        route.request.travelMode = google.maps.TravelMode.BICYCLING;
+                                        directions_service.route(route.request, function(response_0, status) {
+                                            console.log(title + " :: BICYCLING :: " + status);
+                                            if (status != google.maps.DirectionsStatus.OK) {
+                                                if(typeof window.callPhantom == 'function')
+                                                    window.callPhantom({'ev':'errorExit', 'message': status});
+                                            }else{
+                                                generateHyperlapse(response_0);
+                                            }
+                                        });                                    
+                                    }else{
+                                        generateHyperlapse(response_0);
+                                    }
+                                });
+                            }else{
+                                generateHyperlapse(result.response_0);
+                            }
+                        });
+                    }else{
+                        generateHyperlapse(result.response_0);
+                    }
+				});
+
+		}
+    
+    function generateHyperlapse(response){
+        initText(getQueryParameterByName('title',window.location.href));
+        try{
+            hyperlapse.generate({route:response});
+        }catch(e){
+            if(typeof window.callPhantom == 'function') 
+                window.callPhantom({'ev':'errorExit', 'message': e.message});
+        }
+    }
+        function getLongestRoute(response_0){
+            var dist = 0;
+            var bigDist = 0;
+            var bigJ = 0;
+            for(j=0;j<response_0.routes.length;j++){
+                dist = 0;
+                for(i=0;i<response_0.routes[j].legs.length;i++){
+                    dist += response_0.routes[j].legs[i].distance.value;
+                }
+                if(dist > bigDist){
+                    bigDist = dist;
+                    bigJ = j;
+                }
+            }
+            response_0.routes[0] = response_0.routes[bigJ];
+            return {'bigDist': bigDist, 'response_0': response_0};
+        }
+
+    window.onload = init;
+
+	</script> 
+</head> 
+<body> 
+	<div id="text"></div>
+	<div id="pano" style="width:1920px;height:1080px;"></div>
+	<script>
+
+		function initText(theText) {
+			theText = unescape(theText);
+            $('#text').hide();
+            $('#text').text(theText);
+			font = 12;
+            margin = 350;
+		}
+        
+		function render() {
+			console.log('text render called');
+            if($('#text').width() > (window.width/2) || font > 92) return;
+            $('#text').css('font-size', font + 'px');
+            $('#text').css('margin-top', margin + 'px');
+            $('#text').show();
+            margin -= 2;
+            font += 2;
+		}
+
+	</script>
+</body> 
+</html>

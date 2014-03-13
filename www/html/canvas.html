@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html> 
+<head> 
+	<title>Simple Example</title> 
+	<meta http-equiv='Content-Type' content='text/html; charset=utf-8'> 
+	<script src="../static/scripts/three.min.js"></script>
+	<script src="../static/fonts/ubuntu_regular.typeface.js"></script>
+</head> 
+<body> 
+<div id="text" style="width:1280px;height:800px;background-color: black;"></div>
+	<script>
+			function getQueryParameterByName(name, url){
+				console.log(url);
+				name = name.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
+				var regexS = "[\\?&]" + name + "=([^&#]*)";
+				var regex = new RegExp(regexS);
+				var results = regex.exec(url);
+				if(results == null)
+					return "";
+				else
+					return decodeURIComponent(results[1].replace(/\+/g, " "));
+			}
+			var container, stats;
+
+			var camera, scene, renderer;
+
+			var text, parent;
+
+			var targetRotation = 0;
+			var targetRotationOnMouseDown = 0;
+
+			var mouseX = 0;
+			var mouseXOnMouseDown = 0;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			//animate();
+			container = document.getElementById('text');
+
+			camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 2000, 1 );
+			camera.position.set( 0, 50, 1800 );
+
+			scene = new THREE.Scene();
+
+			function initText(theText) {
+				theText = unescape(theText);
+				console.log('text init called::' + theText);
+				var text3d = new THREE.TextGeometry( theText, {
+					size: 50,
+					height: 16,
+					curveSegments: 0,
+					font: "ubuntu"
+				});
+
+				text3d.computeBoundingBox();
+				var centerOffset = -0.5 * ( text3d.boundingBox.max.x - text3d.boundingBox.min.x );
+
+				var textMaterial = new THREE.MeshBasicMaterial( { color: 0xffffff, opacity:0.7, overdraw: false } );
+				text = new THREE.Mesh( text3d, textMaterial );
+
+				text.position.x = centerOffset;
+				text.position.y = 100;
+				text.position.z = 0;
+
+				text.rotation.x = 0;
+				text.rotation.y = Math.PI * 2;
+
+				parent = new THREE.Object3D();
+				parent.add( text );
+
+				scene.add( parent );
+
+				renderer = new THREE.CanvasRenderer();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+			}
+
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+//				stats.update();
+
+			}
+
+			function render() {
+				console.log('text render called');
+				console.log(parent.position.x);
+				console.log(parent.position.y);
+				parent.position.z = targetRotation * 100 ;
+				parent.position.y += 3;
+				targetRotation+=0.4;
+				
+				//parent.position.z -= (( targetRotation - parent.rotation.y ) * 0.05);
+				//parent.rotation.y += ( targetRotation - parent.rotation.y ) * 0.05;
+				renderer.render( scene, camera );
+
+			}
+			initText(getQueryParameterByName('title',window.location.href));
+			render();
+
+		</script>
+
+	
+</body> 
+</html>
